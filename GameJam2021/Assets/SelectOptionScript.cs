@@ -7,24 +7,28 @@ public class SelectOptionScript : MonoBehaviour
     
     enum MenuOption { Start, Load, Options, Credits, Quit}
     MenuOption option = 0;
-    GameObject menuSelector = GameObject.Find("Menu Selector"); 
+    GameObject menuSelector;
+    Vector3 initialPosition;
 
     void Start()
     {
-
+        menuSelector = GameObject.Find("Menu Selector");
+        initialPosition = menuSelector.transform.position;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        if (Input.GetKey(KeyCode.UpArrow))
+        if (Input.GetKeyDown(KeyCode.UpArrow))
             option--;
-        else if (Input.GetKey(KeyCode.DownArrow))
+        else if (Input.GetKeyDown(KeyCode.DownArrow))
             option++;
 
         if (option < 0)
             option = MenuOption.Quit;
-        else if ((int)option > 3)
+        else if ((int)option > 4)
             option = MenuOption.Start;
+
+        menuSelector.transform.position = 
+            new Vector3(initialPosition.x, initialPosition.y - (int)option * 1.4f, initialPosition.z);
     }
 }
