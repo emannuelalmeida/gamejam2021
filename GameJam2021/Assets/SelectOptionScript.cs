@@ -9,6 +9,8 @@ public class SelectOptionScript : MonoBehaviour
     MenuOption option = 0;
     GameObject menuSelector;
     Vector3 initialPosition;
+    public AudioSource audioSource;
+    public AudioClip[] audioClipArray;
 
     void Start()
     {
@@ -19,9 +21,18 @@ public class SelectOptionScript : MonoBehaviour
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.UpArrow))
+        {
             option--;
+            audioSource.PlayOneShot(audioClipArray[0]);
+        }     
         else if (Input.GetKeyDown(KeyCode.DownArrow))
+        {
             option++;
+            audioSource.PlayOneShot(audioClipArray[0]);
+        } else if (Input.GetKeyDown(KeyCode.Return))
+        {
+            audioSource.PlayOneShot(audioClipArray[1]);
+        }
 
         if (option < 0)
             option = MenuOption.Quit;
@@ -30,5 +41,7 @@ public class SelectOptionScript : MonoBehaviour
 
         menuSelector.transform.position = 
             new Vector3(initialPosition.x, initialPosition.y - (int)option * 1.4f, initialPosition.z);
+
+
     }
 }
