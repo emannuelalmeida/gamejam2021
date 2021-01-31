@@ -13,6 +13,9 @@ public class DogControls : MonoBehaviour
         Eating
     }
 
+    public delegate void PowerUpPickAction(PowerUp powerUp); 
+    public event PowerUpPickAction OnPowerUpPicked;
+
     //Movement
     public float speed;
     public float currentSpeed;
@@ -234,7 +237,13 @@ public class DogControls : MonoBehaviour
                 currentSpeed = speed;
                 powerUpTime = -1;
                 break;
+            case PowerUp.Strength:
+                powerUpTime = -1;
+                break;
         }
+
+        if (OnPowerUpPicked != null)
+            OnPowerUpPicked(powerUp);
     }
 
     private void RevokeCurrentPowerUp()
@@ -250,13 +259,16 @@ public class DogControls : MonoBehaviour
                 break;
         }
         powerUp = PowerUp.None;
+        
+        if (OnPowerUpPicked != null)
+            OnPowerUpPicked(powerUp);
     }
 
     private PowerUp ExtractPowerUp(GameObject obj)
     {
         if (obj == null)
             return PowerUp.None;
-        var component = obj.GetComponent<PowerUpComponent>();
+        PowerUpComponent component = obj.GetComponent<PowerUpComponent>();
         if (component == null)
             return PowerUp.None;
         return component.powerUp;
@@ -350,7 +362,7 @@ public class DogControls : MonoBehaviour
     private void StartEating()
     {
         state = State.Eating;
-        actionCooldown = 20;
+        actionCooldown = 50;
     }
 
     private void StartIdling()
