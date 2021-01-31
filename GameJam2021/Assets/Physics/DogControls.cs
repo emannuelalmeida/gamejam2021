@@ -12,7 +12,7 @@ public class DogControls : MonoBehaviour
         Crouching,
         Eating
     }
-    
+
     //Movement
     public float speed;
     public float currentSpeed;
@@ -33,13 +33,20 @@ public class DogControls : MonoBehaviour
     private int actionCooldown = 0;
 
     private Rigidbody2D body;
+    private BoxCollider2D box;
 
     private State state = State.Walking;
-    
+    private PowerUp powerUp = PowerUp.None;
+    private int powerUpTime = 0;
+    private int jumpsAllowed = 1;
+    private int jumps = 0;
+    private bool jumpTriggerReleased = true;
+    private int yMovementCheckCount = 0;
     
     void Start()
     {
         body = GetComponent<Rigidbody2D>();
+        box = GetComponent<BoxCollider2D>();
         animator = GetComponentInChildren<Animator>();
         render = GetComponentInChildren<SpriteRenderer>();
         currentSpeed = speed;
@@ -68,7 +75,7 @@ public class DogControls : MonoBehaviour
 
     void OnCollisionEnter2D()
     {
-        isGrounded = true;
+        yMovementCheckCount = 5;
     }
 
     private void UpdateMovement()
@@ -91,8 +98,14 @@ public class DogControls : MonoBehaviour
 
     private void UpdateAction()
     {
+        if (CanGround())
+            StartGrounding();
+        if (CanFall())
+            StartFalling();
         if(CanJump() && JumpTriggered())
-            StartJumping(); 
+            StartJumping();
+        else if (CanJumpInAir() && JumpTriggered())
+            StartJumping();
         else if (CanSniff() && SniffTriggered())
             StartSniffing();
         else if (CanCrouch() && CrouchTriggered())
@@ -111,11 +124,49 @@ public class DogControls : MonoBehaviour
     {
         if(actionCooldown > 0)
             actionCooldown--;
+        switch (state)
+        {
+            case State.Jumping:
+                jumpTriggerReleased = !JumpTriggered();
+                break;
+            case State.Eating:
+                if (actionCooldown == 0)
+                {
+                    RevokeCurrentPowerUp();
+                    ApplyPowerUp(ExtractPowerUp(currentObject));
+                    isHoldingObject = false;
+                    Object.Destroy(currentObject);
+                    currentObject = null;
+                }
+                break;
+        }
+
+        if (powerUpTime > 0)
+            powerUpTime--;
+        if (powerUpTime == 0)
+        {
+            RevokeCurrentPowerUp();
+        }
+    }
+
+    private bool CanGround()
+    {
+        return yMovementCheckCount > 0;
+    }
+
+    private bool CanFall()
+    {
+        return state != State.Jumping && body.velocity.y < -2f;
     }
 
     private bool CanJump()
     {
         return state == State.Walking;
+    }
+
+    private bool CanJumpInAir()
+    {
+        return state == State.Jumping && jumps < jumpsAllowed && jumpTriggerReleased;
     }
 
     private bool CanSniff()
@@ -166,43 +217,102 @@ public class DogControls : MonoBehaviour
 
     private bool IsEdible(GameObject obj)
     {
-        return obj.name == "Shoe";
+        return obj.GetComponent<PowerUpComponent>() != null;
     }
 
-    private bool JumpTriggered()
+    private void ApplyPowerUp(PowerUp newPowerUp)
+    {
+        powerUp = newPowerUp;
+        switch (powerUp)
+        {
+            case PowerUp.DoubleJump:
+                jumpsAllowed = 2;
+                powerUpTime = -1;
+                break;
+            case PowerUp.DoubleSpeed:
+                speed = speed * 2;
+                currentSpeed = speed;
+                powerUpTime = -1;
+                break;
+        }
+    }
+
+    private void RevokeCurrentPowerUp()
+    {
+        switch (powerUp)
+        {
+            case PowerUp.DoubleJump:
+                jumpsAllowed = 1;
+                break;
+            case PowerUp.DoubleSpeed:
+                speed = speed / 2;
+                currentSpeed = speed;
+                break;
+        }
+        powerUp = PowerUp.None;
+    }
+
+    private PowerUp ExtractPowerUp(GameObject obj)
+    {
+        if (obj == null)
+            return PowerUp.None;
+        var component = obj.GetComponent<PowerUpComponent>();
+        if (component == null)
+            return PowerUp.None;
+        return component.powerUp;
+    }
+
+    public static bool JumpTriggered()
     {
         return Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.Z) ||
                Input.GetKey(KeyCode.W);
     }
 
-    private bool SniffTriggered()
+    public static bool SniffTriggered()
     {
         return Input.GetKey(KeyCode.LeftShift);
     }
 
-    private bool CrouchTriggered()
+    public static bool CrouchTriggered()
     {
         return Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S);
     }
 
-    private bool GrabTriggered()
+    public static bool GrabTriggered()
     {
         return Input.GetKey(KeyCode.G);
     }
 
-    private bool ReleaseTriggered()
+    public static bool ReleaseTriggered()
     {
         return Input.GetKey(KeyCode.G);
     }
 
-    private bool EatTriggered()
+    public static bool EatTriggered()
     {
         return Input.GetKey(KeyCode.LeftShift);
+    }
+
+    private void StartGrounding()
+    {
+        yMovementCheckCount--;
+        isGrounded = Mathf.Abs(body.velocity.y) <= 0.001f;
+        if (isGrounded)
+            yMovementCheckCount = 0;
+    }
+    
+    private void StartFalling()
+    {
+        state = State.Jumping;
+        jumps++;
+        isGrounded = false;
     }
 
     private void StartJumping()
     {
         state = State.Jumping;
+        jumps++;
+        jumpTriggerReleased = false;
         body.velocity = new Vector2(body.velocity.x, jump);
         isGrounded = false;
     }
@@ -240,9 +350,6 @@ public class DogControls : MonoBehaviour
     private void StartEating()
     {
         state = State.Eating;
-        isHoldingObject = false;
-        Object.Destroy(currentObject);
-        currentObject = null;
         actionCooldown = 20;
     }
 
@@ -250,6 +357,7 @@ public class DogControls : MonoBehaviour
     {
         state = State.Walking;
         currentSpeed = speed;
+        jumps = 0;
         isSniffing = false;
         isCrouching = false;
     }
@@ -261,6 +369,6 @@ public class DogControls : MonoBehaviour
         animator.SetBool("isJumping", !isGrounded);
         animator.SetBool("isSniffing", isSniffing);
         animator.SetBool("isCrouching", isCrouching);
-        animator.SetBool("isEating", state == State.Eating);
+        // animator.SetBool("isEating", state == State.Eating);
     }
 }
