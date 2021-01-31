@@ -1,6 +1,5 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class SelectOptionScript : MonoBehaviour
 {
@@ -32,6 +31,7 @@ public class SelectOptionScript : MonoBehaviour
         } else if (Input.GetKeyDown(KeyCode.Return))
         {
             audioSource.PlayOneShot(audioClipArray[1]);
+            ProcessOption();
         }
 
         if (option < 0)
@@ -42,6 +42,20 @@ public class SelectOptionScript : MonoBehaviour
         menuSelector.transform.position = 
             new Vector3(initialPosition.x, initialPosition.y - (int)option * 1.4f, initialPosition.z);
 
+    }
+
+    private void ProcessOption()
+    {
+        Debug.Log(option);
+        switch (option)
+        {
+            case MenuOption.Quit:
+                Application.Quit();
+                break;
+            case MenuOption.Start:
+                SceneManager.LoadScene("External");
+                break;
+        }
 
     }
 }
