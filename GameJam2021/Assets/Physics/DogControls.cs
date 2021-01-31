@@ -4,6 +4,16 @@ using UnityEngine;
 
 public class DogControls : MonoBehaviour
 {
+    enum State
+    {
+        Walking,
+        Jumping,
+        Sniffing,
+        Crouching,
+        Grabbing,
+        Releasing
+    }
+    
     //Movement
     public float speed;
     public float currentSpeed;
@@ -18,6 +28,9 @@ public class DogControls : MonoBehaviour
     bool isCrouching = false;
 
     private Rigidbody2D body;
+
+    private State state = State.Walking;
+    
     
     void Start()
     {
@@ -29,9 +42,9 @@ public class DogControls : MonoBehaviour
     
     void FixedUpdate()
     {
-        UpdateJump(); 
-        UpdateMovement();
         UpdateAction();
+        UpdateMovement();
+        UpdateAnimation();
     }
 
     //Check if Grounded
@@ -43,7 +56,6 @@ public class DogControls : MonoBehaviour
     void OnCollisionEnter2D()
     {
         isGrounded = true;
-        animator.SetBool("isJumping", false);
     }
 
     private void UpdateMovement()
@@ -62,50 +74,126 @@ public class DogControls : MonoBehaviour
 
         body.velocity = new Vector2(moveVelocity, body.velocity.y);
 
-        animator.SetFloat("speedY", body.velocity.y);
-
-        if (moveVelocity != 0) animator.SetBool("isWalking", true);
-        else animator.SetBool("isWalking", false);
-    }
-
-    private void UpdateJump()
-    {
-        //Jumping
-        if(Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.W)) 
-        {
-            if(isGrounded)
-            {
-                animator.SetBool("isJumping", true);
-                body.velocity = new Vector2(body.velocity.x, jump);
-                isGrounded = false;
-                
-            }
-        }
     }
 
     private void UpdateAction()
     {
-        if (Input.GetKeyDown(KeyCode.LeftShift))
-        {
-            isSniffing = true;
-            currentSpeed = speed /2;
-        }
-        else if (Input.GetKeyUp(KeyCode.LeftShift))
-        {
-            isSniffing = false;
-            currentSpeed = speed;
-        }
-        else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
-        {
-            isCrouching = true;
-            currentSpeed = speed /2;
-        }
-        if (Input.GetKeyUp(KeyCode.DownArrow) || Input.GetKeyUp(KeyCode.S))
-        {
-            isCrouching = false;
-            currentSpeed = speed;
-        }
+        if(CanJump() && JumpTriggered())
+            StartJumping(); 
+        else if (CanSniff() && SniffTriggered())
+            StartSniffing();
+        else if (CanCrouch() && CrouchTriggered())
+            StartCrouching();
+        else if (CanGrab() && GrabTriggered())
+            StartGrabbing();
+        else if (CanRelease() && ReleaseTriggered())
+            StartReleasing();
+        else if (CanIdle())
+            StartIdling();
+    }
 
+    private bool CanJump()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanSniff()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanCrouch()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanGrab()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanRelease()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanIdle()
+    {
+        return (state == State.Jumping && isGrounded) 
+            || (state == State.Sniffing && !SniffTriggered())
+            || (state == State.Crouching && !CrouchTriggered());
+    }
+
+    private bool JumpTriggered()
+    {
+        return Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.Z) ||
+               Input.GetKey(KeyCode.W);
+    }
+
+    private bool SniffTriggered()
+    {
+        return Input.GetKey(KeyCode.LeftShift);
+    }
+
+    private bool CrouchTriggered()
+    {
+        return Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S);
+    }
+
+    private bool GrabTriggered()
+    {
+        return false;
+    }
+
+    private bool ReleaseTriggered()
+    {
+        return false;
+    }
+
+    private void StartJumping()
+    {
+        state = State.Jumping;
+        body.velocity = new Vector2(body.velocity.x, jump);
+        isGrounded = false;
+    }
+
+    private void StartSniffing()
+    {
+        state = State.Sniffing;
+        isSniffing = true;
+        currentSpeed = speed /2;
+    }
+
+    private void StartCrouching()
+    {
+        state = State.Crouching;
+        isCrouching = true;
+        currentSpeed = speed /2;
+    }
+
+    private void StartGrabbing()
+    {
+        
+    }
+
+    private void StartReleasing()
+    {
+        
+    }
+
+    private void StartIdling()
+    {
+        state = State.Walking;
+        currentSpeed = speed;
+        isSniffing = false;
+        isCrouching = false;
+    }
+    
+    private void UpdateAnimation()
+    {
+        animator.SetFloat("speedY", body.velocity.y);
+        animator.SetBool("isWalking", moveVelocity != 0);
+        animator.SetBool("isJumping", !isGrounded);
         animator.SetBool("isSniffing", isSniffing);
         animator.SetBool("isCrouching", isCrouching);
     }
