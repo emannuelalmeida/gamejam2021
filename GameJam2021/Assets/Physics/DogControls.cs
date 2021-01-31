@@ -4,6 +4,15 @@ using UnityEngine;
 
 public class DogControls : MonoBehaviour
 {
+    enum State
+    {
+        Walking,
+        Jumping,
+        Sniffing,
+        Crouching,
+        Eating
+    }
+    
     //Movement
     public float speed;
     public float currentSpeed;
@@ -17,7 +26,16 @@ public class DogControls : MonoBehaviour
     bool isSniffing = false;
     bool isCrouching = false;
 
+    private bool isHoldingObject = false;
+    private GameObject currentObject = null;
+    private bool isShoeInRange = false;
+    private GameObject shoeInRange = null;
+    private int actionCooldown = 0;
+
     private Rigidbody2D body;
+
+    private State state = State.Walking;
+    
     
     void Start()
     {
@@ -29,84 +47,220 @@ public class DogControls : MonoBehaviour
     
     void FixedUpdate()
     {
-        UpdateJump(); 
-        UpdateMovement();
         UpdateAction();
+        UpdateMovement();
+        UpdateState();
+        UpdateAnimation();
     }
 
     //Check if Grounded
-    void OnTriggerEnter2D()
+    void OnTriggerEnter2D(Collider2D col)
     {
-        isGrounded = true;
+        shoeInRange = col.gameObject;
+        isShoeInRange = true;
+    }
+
+    void OnTriggerExit2D()
+    {
+        shoeInRange = null;
+        isShoeInRange = false;
     }
 
     void OnCollisionEnter2D()
     {
         isGrounded = true;
-        animator.SetBool("isJumping", false);
     }
 
     private void UpdateMovement()
     {
-        //Left Right Movement
-        float x = Input.GetAxis("Horizontal");
-        moveVelocity = x * currentSpeed;
-        
-        if (x > 0)
+        if (CanMove())
         {
-            render.flipX = true;
-        } else if (x < 0)
+            //Left Right Movement
+            float x = Input.GetAxis("Horizontal");
+            moveVelocity = x * currentSpeed;
+            if(x != 0)
+                render.flipX = x > 0;
+        }
+        else
         {
-            render.flipX = false;
+            moveVelocity = 0;
         }
 
         body.velocity = new Vector2(moveVelocity, body.velocity.y);
-
-        animator.SetFloat("speedY", body.velocity.y);
-
-        if (moveVelocity != 0) animator.SetBool("isWalking", true);
-        else animator.SetBool("isWalking", false);
-    }
-
-    private void UpdateJump()
-    {
-        //Jumping
-        if(Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.W)) 
-        {
-            if(isGrounded)
-            {
-                animator.SetBool("isJumping", true);
-                body.velocity = new Vector2(body.velocity.x, jump);
-                isGrounded = false;
-                
-            }
-        }
     }
 
     private void UpdateAction()
     {
-        if (Input.GetKeyDown(KeyCode.LeftShift))
-        {
-            isSniffing = true;
-            currentSpeed = speed /2;
-        }
-        else if (Input.GetKeyUp(KeyCode.LeftShift))
-        {
-            isSniffing = false;
-            currentSpeed = speed;
-        }
-        else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S))
-        {
-            isCrouching = true;
-            currentSpeed = speed /2;
-        }
-        if (Input.GetKeyUp(KeyCode.DownArrow) || Input.GetKeyUp(KeyCode.S))
-        {
-            isCrouching = false;
-            currentSpeed = speed;
-        }
+        if(CanJump() && JumpTriggered())
+            StartJumping(); 
+        else if (CanSniff() && SniffTriggered())
+            StartSniffing();
+        else if (CanCrouch() && CrouchTriggered())
+            StartCrouching();
+        else if (CanGrab() && GrabTriggered())
+            StartGrabbing();
+        else if (CanRelease() && ReleaseTriggered())
+            StartReleasing();
+        else if (CanEat() && EatTriggered())
+            StartEating();
+        else if (CanIdle())
+            StartIdling();
+    }
 
+    private void UpdateState()
+    {
+        if(actionCooldown > 0)
+            actionCooldown--;
+    }
+
+    private bool CanJump()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanSniff()
+    {
+        return !isHoldingObject && state == State.Walking;
+    }
+
+    private bool CanCrouch()
+    {
+        return state == State.Walking;
+    }
+
+    private bool CanGrab()
+    {
+        return !isHoldingObject
+               && isShoeInRange
+               && actionCooldown == 0 
+               && (state == State.Walking || state == State.Jumping || state == State.Crouching);
+    }
+
+    private bool CanRelease()
+    {
+        return isHoldingObject
+               && actionCooldown == 0 
+               && state == State.Walking;
+    }
+
+    private bool CanEat()
+    {
+        return isHoldingObject
+               && actionCooldown == 0
+               && state == State.Walking
+               && IsEdible(currentObject);
+    }
+
+    private bool CanIdle()
+    {
+        return (state == State.Jumping && isGrounded) 
+            || (state == State.Sniffing && !SniffTriggered())
+            || (state == State.Crouching && !CrouchTriggered())
+            || (state == State.Eating && actionCooldown == 0);
+    }
+
+    private bool CanMove()
+    {
+        return state != State.Eating;
+    }
+
+    private bool IsEdible(GameObject obj)
+    {
+        return obj.name == "Shoe";
+    }
+
+    private bool JumpTriggered()
+    {
+        return Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.Z) ||
+               Input.GetKey(KeyCode.W);
+    }
+
+    private bool SniffTriggered()
+    {
+        return Input.GetKey(KeyCode.LeftShift);
+    }
+
+    private bool CrouchTriggered()
+    {
+        return Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.S);
+    }
+
+    private bool GrabTriggered()
+    {
+        return Input.GetKey(KeyCode.G);
+    }
+
+    private bool ReleaseTriggered()
+    {
+        return Input.GetKey(KeyCode.G);
+    }
+
+    private bool EatTriggered()
+    {
+        return Input.GetKey(KeyCode.LeftShift);
+    }
+
+    private void StartJumping()
+    {
+        state = State.Jumping;
+        body.velocity = new Vector2(body.velocity.x, jump);
+        isGrounded = false;
+    }
+
+    private void StartSniffing()
+    {
+        state = State.Sniffing;
+        isSniffing = true;
+        currentSpeed = speed /2;
+    }
+
+    private void StartCrouching()
+    {
+        state = State.Crouching;
+        isCrouching = true;
+        currentSpeed = speed /2;
+    }
+
+    private void StartGrabbing()
+    {
+        isHoldingObject = true;
+        shoeInRange.transform.SetParent(gameObject.transform);
+        currentObject = shoeInRange;
+        actionCooldown = 10;
+    }
+
+    private void StartReleasing()
+    {
+        isHoldingObject = false;
+        currentObject.transform.SetParent(null);
+        currentObject = null;
+        actionCooldown = 10;
+    }
+
+    private void StartEating()
+    {
+        state = State.Eating;
+        isHoldingObject = false;
+        Object.Destroy(currentObject);
+        currentObject = null;
+        actionCooldown = 20;
+    }
+
+    private void StartIdling()
+    {
+        state = State.Walking;
+        currentSpeed = speed;
+        isSniffing = false;
+        isCrouching = false;
+    }
+    
+    private void UpdateAnimation()
+    {
+        animator.SetFloat("speedY", body.velocity.y);
+        animator.SetBool("isWalking", moveVelocity != 0);
+        animator.SetBool("isJumping", !isGrounded);
         animator.SetBool("isSniffing", isSniffing);
         animator.SetBool("isCrouching", isCrouching);
+        animator.SetBool("isEating", state == State.Eating);
     }
 }
