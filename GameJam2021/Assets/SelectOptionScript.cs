@@ -55,6 +55,9 @@ public class SelectOptionScript : MonoBehaviour
             case MenuOption.Start:
                 SceneManager.LoadScene("External");
                 break;
+            case MenuOption.Credits:
+                SceneManager.LoadScene("Credits");
+                break;
         }
 
     }

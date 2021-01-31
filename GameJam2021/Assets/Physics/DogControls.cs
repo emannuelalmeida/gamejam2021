@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -67,20 +67,19 @@ public class DogControls : MonoBehaviour
     void OnTriggerEnter2D(Collider2D col)
     {
         shoesInRange.Add(col.gameObject);
-        Debug.Log("Added " + col.gameObject.name + ", new Count is " + shoesInRange.Count);
         isShoeInRange = true;
     }
 
     void OnTriggerExit2D(Collider2D col)
     {
         shoesInRange.Remove(col.gameObject);
-        Debug.Log("Removed " + col.gameObject.name + ", new Count is " + shoesInRange.Count);
         isShoeInRange = shoesInRange.Count > 0;
     }
 
-    void OnCollisionEnter2D()
+    void OnCollisionEnter2D(Collision2D col)
     {
         yMovementCheckCount = 5;
+
     }
 
     private void UpdateMovement()
