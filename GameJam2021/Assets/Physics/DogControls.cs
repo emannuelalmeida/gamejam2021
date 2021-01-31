@@ -32,7 +32,7 @@ public class DogControls : MonoBehaviour
     private bool isHoldingObject = false;
     private GameObject currentObject = null;
     private bool isShoeInRange = false;
-    private GameObject shoeInRange = null;
+    private List<GameObject> shoesInRange = new List<GameObject>();
     private int actionCooldown = 0;
 
     private Rigidbody2D body;
@@ -66,14 +66,16 @@ public class DogControls : MonoBehaviour
     //Check if Grounded
     void OnTriggerEnter2D(Collider2D col)
     {
-        shoeInRange = col.gameObject;
+        shoesInRange.Add(col.gameObject);
+        Debug.Log("Added " + col.gameObject.name + ", new Count is " + shoesInRange.Count);
         isShoeInRange = true;
     }
 
-    void OnTriggerExit2D()
+    void OnTriggerExit2D(Collider2D col)
     {
-        shoeInRange = null;
-        isShoeInRange = false;
+        shoesInRange.Remove(col.gameObject);
+        Debug.Log("Removed " + col.gameObject.name + ", new Count is " + shoesInRange.Count);
+        isShoeInRange = shoesInRange.Count > 0;
     }
 
     void OnCollisionEnter2D()
@@ -346,8 +348,27 @@ public class DogControls : MonoBehaviour
     private void StartGrabbing()
     {
         isHoldingObject = true;
-        shoeInRange.transform.SetParent(gameObject.transform);
-        currentObject = shoeInRange;
+        GameObject closestShoe = shoesInRange[0];
+        Collider2D closestCollider = closestShoe.GetComponent<Collider2D>();
+        float closestDistance =
+            Vector2.Distance(box.bounds.center, closestCollider.bounds.center);
+        for (int i = 1; i < shoesInRange.Count; ++i)
+        {
+            GameObject otherShoe = shoesInRange[i];
+            Collider2D otherCollider = otherShoe.GetComponent<Collider2D>();
+            float otherDistance =
+                Vector2.Distance(box.bounds.center, otherCollider.bounds.center);
+            if (otherDistance < closestDistance)
+            {
+                closestShoe = otherShoe;
+                closestCollider = otherCollider;
+                closestDistance = otherDistance;
+            }
+        }
+        shoesInRange.Remove(closestShoe);
+        closestCollider.enabled = false;
+        closestShoe.transform.SetParent(gameObject.transform);
+        currentObject = closestShoe;
         actionCooldown = 10;
     }
 
@@ -355,6 +376,7 @@ public class DogControls : MonoBehaviour
     {
         isHoldingObject = false;
         currentObject.transform.SetParent(null);
+        currentObject.GetComponent<Collider2D>().enabled = true;
         currentObject = null;
         actionCooldown = 10;
     }
