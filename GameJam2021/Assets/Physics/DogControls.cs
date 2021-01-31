@@ -10,8 +10,7 @@ public class DogControls : MonoBehaviour
         Jumping,
         Sniffing,
         Crouching,
-        Grabbing,
-        Releasing
+        Eating
     }
     
     //Movement
@@ -26,6 +25,12 @@ public class DogControls : MonoBehaviour
     bool isGrounded = true;
     bool isSniffing = false;
     bool isCrouching = false;
+
+    private bool isHoldingObject = false;
+    private GameObject currentObject = null;
+    private bool isShoeInRange = false;
+    private GameObject shoeInRange = null;
+    private int actionCooldown = 0;
 
     private Rigidbody2D body;
 
@@ -44,13 +49,21 @@ public class DogControls : MonoBehaviour
     {
         UpdateAction();
         UpdateMovement();
+        UpdateState();
         UpdateAnimation();
     }
 
     //Check if Grounded
-    void OnTriggerEnter2D()
+    void OnTriggerEnter2D(Collider2D col)
     {
-        isGrounded = true;
+        shoeInRange = col.gameObject;
+        isShoeInRange = true;
+    }
+
+    void OnTriggerExit2D()
+    {
+        shoeInRange = null;
+        isShoeInRange = false;
     }
 
     void OnCollisionEnter2D()
@@ -60,20 +73,20 @@ public class DogControls : MonoBehaviour
 
     private void UpdateMovement()
     {
-        //Left Right Movement
-        float x = Input.GetAxis("Horizontal");
-        moveVelocity = x * currentSpeed;
-        
-        if (x > 0)
+        if (CanMove())
         {
-            render.flipX = true;
-        } else if (x < 0)
+            //Left Right Movement
+            float x = Input.GetAxis("Horizontal");
+            moveVelocity = x * currentSpeed;
+            if(x != 0)
+                render.flipX = x > 0;
+        }
+        else
         {
-            render.flipX = false;
+            moveVelocity = 0;
         }
 
         body.velocity = new Vector2(moveVelocity, body.velocity.y);
-
     }
 
     private void UpdateAction()
@@ -88,8 +101,16 @@ public class DogControls : MonoBehaviour
             StartGrabbing();
         else if (CanRelease() && ReleaseTriggered())
             StartReleasing();
+        else if (CanEat() && EatTriggered())
+            StartEating();
         else if (CanIdle())
             StartIdling();
+    }
+
+    private void UpdateState()
+    {
+        if(actionCooldown > 0)
+            actionCooldown--;
     }
 
     private bool CanJump()
@@ -99,7 +120,7 @@ public class DogControls : MonoBehaviour
 
     private bool CanSniff()
     {
-        return state == State.Walking;
+        return !isHoldingObject && state == State.Walking;
     }
 
     private bool CanCrouch()
@@ -109,19 +130,43 @@ public class DogControls : MonoBehaviour
 
     private bool CanGrab()
     {
-        return state == State.Walking;
+        return !isHoldingObject
+               && isShoeInRange
+               && actionCooldown == 0 
+               && (state == State.Walking || state == State.Jumping || state == State.Crouching);
     }
 
     private bool CanRelease()
     {
-        return state == State.Walking;
+        return isHoldingObject
+               && actionCooldown == 0 
+               && state == State.Walking;
+    }
+
+    private bool CanEat()
+    {
+        return isHoldingObject
+               && actionCooldown == 0
+               && state == State.Walking
+               && IsEdible(currentObject);
     }
 
     private bool CanIdle()
     {
         return (state == State.Jumping && isGrounded) 
             || (state == State.Sniffing && !SniffTriggered())
-            || (state == State.Crouching && !CrouchTriggered());
+            || (state == State.Crouching && !CrouchTriggered())
+            || (state == State.Eating && actionCooldown == 0);
+    }
+
+    private bool CanMove()
+    {
+        return state != State.Eating;
+    }
+
+    private bool IsEdible(GameObject obj)
+    {
+        return obj.name == "Shoe";
     }
 
     private bool JumpTriggered()
@@ -142,12 +187,17 @@ public class DogControls : MonoBehaviour
 
     private bool GrabTriggered()
     {
-        return false;
+        return Input.GetKey(KeyCode.G);
     }
 
     private bool ReleaseTriggered()
     {
-        return false;
+        return Input.GetKey(KeyCode.G);
+    }
+
+    private bool EatTriggered()
+    {
+        return Input.GetKey(KeyCode.LeftShift);
     }
 
     private void StartJumping()
@@ -173,12 +223,27 @@ public class DogControls : MonoBehaviour
 
     private void StartGrabbing()
     {
-        
+        isHoldingObject = true;
+        shoeInRange.transform.SetParent(gameObject.transform);
+        currentObject = shoeInRange;
+        actionCooldown = 10;
     }
 
     private void StartReleasing()
     {
-        
+        isHoldingObject = false;
+        currentObject.transform.SetParent(null);
+        currentObject = null;
+        actionCooldown = 10;
+    }
+
+    private void StartEating()
+    {
+        state = State.Eating;
+        isHoldingObject = false;
+        Object.Destroy(currentObject);
+        currentObject = null;
+        actionCooldown = 20;
     }
 
     private void StartIdling()
@@ -196,5 +261,6 @@ public class DogControls : MonoBehaviour
         animator.SetBool("isJumping", !isGrounded);
         animator.SetBool("isSniffing", isSniffing);
         animator.SetBool("isCrouching", isCrouching);
+        animator.SetBool("isEating", state == State.Eating);
     }
 }
